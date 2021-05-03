@@ -76,7 +76,7 @@ def get_db_match_timeline():
 
 
 def print_pretty(obj):
-  print(json.dumps(obj, indent=2,ensure_ascii=False))
+  logger.debug(json.dumps(obj, indent=2,ensure_ascii=False))
 
 @sleep_and_retry
 @limits(calls=8, period=TWO_MINUTES)
@@ -131,14 +131,17 @@ def fetch_one_puuid(puuid):
             get_db_match_list().update_one(matchobj, {"$set":matchobj}, upsert=True)
 
             match = get_match_detail(matchid)
-            get_db_match_detail().update_one({"matchid":matchid}, {"$set":match}, upsert=True)
-            #match = get_match_detail(matchid)
-            print_pretty(match)
-            puuid_list = match["metadata"]["participants"]
-            for pid in puuid_list:
-                get_db_summoner().update_one({"puuid":pid}, {"$set": {"puuid":pid}}, upsert=True)
+            if(hasattr(match, "metadata")):
+                get_db_match_detail().update_one({"matchid":matchid}, {"$set":match}, upsert=True)
+                #match = get_match_detail(matchid)
+                print_pretty(match)
+                puuid_list = match["metadata"]["participants"]
+                for pid in puuid_list:
+                    get_db_summoner().update_one({"puuid":pid}, {"$set": {"puuid":pid}}, upsert=True)
+            else:
+                print_pretty(match)
         else:
-            print(f"We had this match before {matchid}")
+            logger.debug(f"We had this match before {matchid}")
 
 def main(args) -> None:
     global dbconn
@@ -169,7 +172,7 @@ def main(args) -> None:
     while True:
         pid_list = db_summoner.find({"name": {"$exists": False}}, {"puuid":1,"_id": False})
         if (len(pid_list)) == 0:
-            print("We get all the puuid")
+            logger.debug("We get all the puuid")
             break
         for puid in pid_list:
             fetch_one_puuid(puid)
