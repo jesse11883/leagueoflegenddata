@@ -164,18 +164,18 @@ def main(args) -> None:
     db_match_timeline.create_index([("matchid", pymongo.ASCENDING)], name='idx_matchid', unique = True)
 
 
-    r = get_summoner_by_name('bobsprite1')
-    print_pretty(r)
-    db_summoner.update_one({"puuid":r["puuid"]}, {"$set":r}, upsert=True)
-    puuid = r["puuid"]
-    fetch_one_puuid(puuid)
+    # r = get_summoner_by_name('bobsprite1')
+    # print_pretty(r)
+    # db_summoner.update_one({"puuid":r["puuid"]}, {"$set":r}, upsert=True)
+    # puuid = r["puuid"]
+    # fetch_one_puuid(puuid)
     while True:
         pid_list = db_summoner.find({"name": {"$exists": False}}, {"puuid":1,"_id": False})
-        if (len(pid_list)) == 0:
+        if pid_list.count() == 0:
             logger.debug("We get all the puuid")
             break
         for puid in pid_list:
-            fetch_one_puuid(puid)
+            fetch_one_puuid(puid["puuid"])
 
 
 
