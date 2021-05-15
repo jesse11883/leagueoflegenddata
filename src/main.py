@@ -81,7 +81,7 @@ def print_pretty(obj):
 @sleep_and_retry
 @limits(calls=8, period=TWO_MINUTES)
 def retrieve(url, base_url = URL_NA):
-    headers ={ "X-Riot-Token":'RGAPI-93fb270d-7925-4b2e-a4b2-2865c2c31d7e'}
+    headers ={ "X-Riot-Token":'RGAPI-466e1d70-f2ca-4f9d-825d-d694c826e430'}
     request_url = urllib.parse.urljoin(base_url, url)
     r = requests.get(request_url,  headers=headers)
     return r.json()
@@ -97,7 +97,7 @@ def get_match_list_puuid(puuid):
     match_list = []
     while True:
         r = retrieve(f"/lol/match/v5/matches/by-puuid/{puuid}/ids?start={start}&count={count}", base_url)
-        print_pretty(r)
+        logger.debug(json.dumps(r, indent=2,ensure_ascii=False))
         match_list = match_list + r
         if (len(r) < count):
             break
@@ -115,33 +115,73 @@ def get_match_detail(matchId):
 
 def get_summoner_by_puuid(puuid):
     r = retrieve(f"/lol/summoner/v4/summoners/by-puuid/{puuid}")
+    logger.debug(f"r=>{r}")
     return r
 
 def fetch_one_puuid(puuid):
+    logger.debug(f"process puuid {puuid}")
     r = get_summoner_by_puuid(puuid)
-
+    logger.debug(f"get summoner name: {r['name']}")
     get_db_summoner().update_one({"puuid":r["puuid"]}, {"$set":r}, upsert=True)
     m = get_match_list_puuid(r["puuid"])
 
     for matchid in m:
+        logger.debug(f"query matchid {matchid}")
         matchobj = {"matchid":matchid}
         match_db_id = get_db_match_list().find_one({"matchid":matchid})
+        update_detail = False
+        update_timeline = False
         if (not match_db_id):
 
+            logger.debug(f"add new match id:")
+            logger.debug(json.dumps(matchobj, indent=2,ensure_ascii=False))
             get_db_match_list().update_one(matchobj, {"$set":matchobj}, upsert=True)
+            update_detail = True
+            update_timeline = True
+        else:
+            logger.debug(f"We had this match before {matchid}")
+            match_detail_db = get_db_match_detail().find_one({"matchid":matchid},  {"metadata":1,"_id": False})
+            if(not match_detail_db or (not match_detail_db["metadata"])):
+                logger.debug(f"We are missing match detail for {matchid}")
+                update_detail = True
+                
+            match_timeline_db = get_db_match_timeline().find_one({"matchid":matchid},  {"metadata":1,"_id": False})
+            if(not match_timeline_db or (not match_timeline_db["metadata"])):
+                logger.debug(f"We are missing match timeline for {matchid}")
+                update_timeline = True
 
+        if update_detail:
             match = get_match_detail(matchid)
-            if(hasattr(match, "metadata")):
+            if  hasattr(match, "metadata") or "metadata" in match:
+                logger.debug(f"update new match detail id: {matchid}")
                 get_db_match_detail().update_one({"matchid":matchid}, {"$set":match}, upsert=True)
                 #match = get_match_detail(matchid)
-                print_pretty(match)
+                #logger.debug(json.dumps(match, indent=2,ensure_ascii=False))
+                logger.debug(json.dumps(match["metadata"]["participants"], indent=2,ensure_ascii=False))
                 puuid_list = match["metadata"]["participants"]
                 for pid in puuid_list:
                     get_db_summoner().update_one({"puuid":pid}, {"$set": {"puuid":pid}}, upsert=True)
             else:
-                print_pretty(match)
-        else:
-            logger.debug(f"We had this match before {matchid}")
+                logger.error(f"fail to retrieve match detail id: {matchid}")
+                logger.error(json.dumps(match, indent=2,ensure_ascii=False))
+
+        if update_timeline:
+            match = get_match_timeline(matchid)
+            if hasattr(match, "metadata") or "metadata" in match:
+                logger.debug(f"update new match time id: {matchid}")
+                get_db_match_timeline().update_one({"matchid":matchid}, {"$set":match}, upsert=True)
+                #match = get_match_detail(matchid)
+                #logger.debug(json.dumps(match, indent=2,ensure_ascii=False))
+                logger.debug(json.dumps(match["metadata"]["participants"], indent=2,ensure_ascii=False))
+                puuid_list = match["metadata"]["participants"]
+                for pid in puuid_list:
+                    get_db_summoner().update_one({"puuid":pid}, {"$set": {"puuid":pid}}, upsert=True)
+            else:
+                logger.error(f"fail to retrieve match timeline id: {matchid}")
+                logger.error(json.dumps(match, indent=2,ensure_ascii=False))
+
+
+
 
 def main(args) -> None:
     global dbconn
@@ -175,6 +215,7 @@ def main(args) -> None:
             logger.debug("We get all the puuid")
             break
         for puid in pid_list:
+            
             fetch_one_puuid(puid["puuid"])
 
 

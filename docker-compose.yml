@@ -4,16 +4,13 @@ services:
     game_python3:
         build: 
             context: .
-            args:
-              - GID=${GID}
-              - UID=${UID}
         image: lol_python3:v1.0
-        user: "${UID}:${GID}"
+        user: ${CURRENT_UID}
         volumes:
             - ${HOST_DEV_HOME}:${CONTAINER_DEV_HOME}
         ports:
             - "${HOST_PORT}:${CONTAINER_PORT}"
         working_dir: ${CONTAINER_DEV_HOME}/git
-        container_name: ${CONTAINER_NAME}
         entrypoint: ["bash"]
-
+        tty: true
+        stdin_open: true
