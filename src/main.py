@@ -20,13 +20,13 @@ from pathlib import Path
 import time
 timestring = time.strftime("_%Y_%m_%d_%H_%M_%S")
 logger = logging.getLogger("loldata")
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 # create file handler which logs even debug messages
 fh = logging.FileHandler("./logs/loldata" + timestring +  '.log')
 fh.setLevel(logging.DEBUG)
 # create console handler with a higher log level
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
+ch.setLevel(logging.INFO)
 # create formatter and add it to the handlers
 formatter = logging.Formatter('%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 ch.setFormatter(formatter)
@@ -81,7 +81,7 @@ def print_pretty(obj):
 @sleep_and_retry
 @limits(calls=8, period=TWO_MINUTES)
 def retrieve(url, base_url = URL_NA):
-    headers ={ "X-Riot-Token":'RGAPI-466e1d70-f2ca-4f9d-825d-d694c826e430'}
+    headers ={ "X-Riot-Token":'RGAPI-b522a602-6b63-4486-bbfb-1b863f7f01f7'}
     request_url = urllib.parse.urljoin(base_url, url)
     r = requests.get(request_url,  headers=headers)
     return r.json()
@@ -98,7 +98,11 @@ def get_match_list_puuid(puuid):
     while True:
         r = retrieve(f"/lol/match/v5/matches/by-puuid/{puuid}/ids?start={start}&count={count}", base_url)
         logger.debug(json.dumps(r, indent=2,ensure_ascii=False))
-        match_list = match_list + r
+        try:
+            match_list = match_list + r
+        except:
+            logger.error(json.dumps(r, indent=2,ensure_ascii=False))
+            raise
         if (len(r) < count):
             break
         else:
@@ -119,12 +123,13 @@ def get_summoner_by_puuid(puuid):
     return r
 
 def fetch_one_puuid(puuid):
-    logger.debug(f"process puuid {puuid}")
+    logger.info(f"process puuid {puuid}")
     r = get_summoner_by_puuid(puuid)
-    logger.debug(f"get summoner name: {r['name']}")
+    logger.info(f"get summoner name: {r['name']}")
     get_db_summoner().update_one({"puuid":r["puuid"]}, {"$set":r}, upsert=True)
     m = get_match_list_puuid(r["puuid"])
-
+    logger.info(f"get {len(m)} matches.")
+    mcount = 0
     for matchid in m:
         logger.debug(f"query matchid {matchid}")
         matchobj = {"matchid":matchid}
@@ -145,10 +150,10 @@ def fetch_one_puuid(puuid):
                 logger.debug(f"We are missing match detail for {matchid}")
                 update_detail = True
                 
-            match_timeline_db = get_db_match_timeline().find_one({"matchid":matchid},  {"metadata":1,"_id": False})
-            if(not match_timeline_db or (not match_timeline_db["metadata"])):
-                logger.debug(f"We are missing match timeline for {matchid}")
-                update_timeline = True
+            # match_timeline_db = get_db_match_timeline().find_one({"matchid":matchid},  {"metadata":1,"_id": False})
+            # if(not match_timeline_db or (not match_timeline_db["metadata"])):
+            #     logger.debug(f"We are missing match timeline for {matchid}")
+            #     update_timeline = True
 
         if update_detail:
             match = get_match_detail(matchid)
@@ -164,21 +169,23 @@ def fetch_one_puuid(puuid):
             else:
                 logger.error(f"fail to retrieve match detail id: {matchid}")
                 logger.error(json.dumps(match, indent=2,ensure_ascii=False))
-
-        if update_timeline:
-            match = get_match_timeline(matchid)
-            if hasattr(match, "metadata") or "metadata" in match:
-                logger.debug(f"update new match time id: {matchid}")
-                get_db_match_timeline().update_one({"matchid":matchid}, {"$set":match}, upsert=True)
-                #match = get_match_detail(matchid)
-                #logger.debug(json.dumps(match, indent=2,ensure_ascii=False))
-                logger.debug(json.dumps(match["metadata"]["participants"], indent=2,ensure_ascii=False))
-                puuid_list = match["metadata"]["participants"]
-                for pid in puuid_list:
-                    get_db_summoner().update_one({"puuid":pid}, {"$set": {"puuid":pid}}, upsert=True)
-            else:
-                logger.error(f"fail to retrieve match timeline id: {matchid}")
-                logger.error(json.dumps(match, indent=2,ensure_ascii=False))
+        mcount+=1
+        if(mcount % 100 == 0):
+            logger.info(f"processed {mcount}")
+        # if update_timeline:
+        #     match = get_match_timeline(matchid)
+        #     if hasattr(match, "metadata") or "metadata" in match:
+        #         logger.debug(f"update new match time id: {matchid}")
+        #         get_db_match_timeline().update_one({"matchid":matchid}, {"$set":match}, upsert=True)
+        #         #match = get_match_detail(matchid)
+        #         #logger.debug(json.dumps(match, indent=2,ensure_ascii=False))
+        #         logger.debug(json.dumps(match["metadata"]["participants"], indent=2,ensure_ascii=False))
+        #         puuid_list = match["metadata"]["participants"]
+        #         for pid in puuid_list:
+        #             get_db_summoner().update_one({"puuid":pid}, {"$set": {"puuid":pid}}, upsert=True)
+        #     else:
+        #         logger.error(f"fail to retrieve match timeline id: {matchid}")
+        #         logger.error(json.dumps(match, indent=2,ensure_ascii=False))
 
 
 
@@ -209,15 +216,18 @@ def main(args) -> None:
     # db_summoner.update_one({"puuid":r["puuid"]}, {"$set":r}, upsert=True)
     # puuid = r["puuid"]
     # fetch_one_puuid(puuid)
+    count = 0
     while True:
-        pid_list = db_summoner.find({"name": {"$exists": False}}, {"puuid":1,"_id": False})
-        if pid_list.count() == 0:
+        pid_list = list(db_summoner.find({"name": {"$exists": False}}, {"puuid":1,"_id": False}).sort("_id",pymongo.ASCENDING).limit(100))
+        if len(pid_list) == 0:
             logger.debug("We get all the puuid")
             break
         for puid in pid_list:
             
             fetch_one_puuid(puid["puuid"])
-
+            count += 1
+            if(count % 100 == 0):
+                logger.info(f"processing {count} users")
 
 
 def add_extra_arg(parser):

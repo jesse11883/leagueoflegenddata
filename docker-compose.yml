@@ -9,7 +9,7 @@ services:
         volumes:
             - ${HOST_DEV_HOME}:${CONTAINER_DEV_HOME}
         ports:
-            - "${HOST_PORT}:${CONTAINER_PORT}"
+            - "${CONTAINER_PORT}"
         working_dir: ${CONTAINER_DEV_HOME}/git
         entrypoint: ["bash"]
         tty: true

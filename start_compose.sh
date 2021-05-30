@@ -1,1 +1,1 @@
-CURRENT_UID=$(id -u):$(id -g) docker-compose   --env-file .env up -d --no-build
+CURRENT_UID=$(id -u):$(id -g) docker-compose   --env-file .env up -d --no-build  --scale game_python3=3
