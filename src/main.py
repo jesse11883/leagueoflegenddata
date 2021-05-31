@@ -81,7 +81,7 @@ def print_pretty(obj):
 @sleep_and_retry
 @limits(calls=8, period=TWO_MINUTES)
 def retrieve(url, base_url = URL_NA):
-    headers ={ "X-Riot-Token":'RGAPI-b522a602-6b63-4486-bbfb-1b863f7f01f7'}
+    headers ={ "X-Riot-Token":'RGAPI-250e7c71-bb0d-456c-a674-cf795ab07584'}
     request_url = urllib.parse.urljoin(base_url, url)
     r = requests.get(request_url,  headers=headers)
     return r.json()
