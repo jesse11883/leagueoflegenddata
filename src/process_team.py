@@ -110,8 +110,8 @@ def main(args) -> None:
 
     max_processid = db_pat_match.find().sort("processid",pymongo.DESCENDING).limit(1)
     for p in max_processid:
-        print(p)
-    match_list = db_match_detail.find({"info.queueId":400}).sort("_id",pymongo.DESCENDING)
+        logger.debug(p)
+    match_list = db_match_detail.find({"info.queueId":400}).sort("_id",pymongo.ASCENDING)
     count = 0
     #total = db_match_detail.count_documents({"_id" :{"$gte": max_processid}, "info.queueId":400})
     #logger.debug(f"query matchid {total}")
@@ -120,16 +120,18 @@ def main(args) -> None:
             pat_match = {   "puuid": pat["puuid"], 
                             "summonerName": pat["summonerName"],
                             "teamid": pat["teamId"],
-                            "matchid": match["matchid"]
+                            "matchid": match["matchid"],
+                            "processid": match["_id"]
                         }
-            print(pat_match)
+            logger.debug(pat_match)
             db_pat_match.update_one(
                 {"puuid": pat["puuid"],"teamid": pat["teamId"], "matchid": match["matchid"] },
-                {"$set": {"summonerName": pat["summonerName"], "processid": match["_id"]}},
+                {"$set": pat_match},
                 upsert=True)
             count += 1
             if( count % 1000 ):
                 logger.debug(f'update:{count} -> {pat["summonerName"]} {match["matchid"]} ')
+        
 
 
 
@@ -151,6 +153,6 @@ if __name__ == "__main__":
 
     args = x8common.init_argparse(add_extra_arg)
 
-    logger.info(f"cmd:{args.cmd}")
+    logger.info(f"cmd:{args.cmd}  process_team.py")
 
     main(args)

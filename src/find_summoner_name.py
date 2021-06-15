@@ -49,46 +49,41 @@ def print_pretty(obj):
   logger.debug(json.dumps(obj, indent=2,ensure_ascii=False))
 
 
-def process_one_pat(puuid):
-    matching_rec = get_db_pat_match().count_documents({"puuid":puuid})
-    #logger.debug(f"{puuid} has {matching_rec} matches")
-    # We only process puuid that larger than me
-    match_list = get_db_pat_match().find({"puuid":puuid})
+#team can only be 0 or 1
+def process_one_match(md):
+    if ("metadata" not in md):
+        logger.debug(md)
+        return
+    
+    pats = md["info"]["participants"]
+    for i in range(len(pats)):
+        pat = pats[i]
+        get_db_summoner().update_one(
+            {"puuid": pat["puuid"], "name": {"$exists": False}}, 
+            {
+                "$set":
+                    {
+                        "summonerLevel":pat["summonerLevel"], 
+                        "name":pat["summonerName"],
+                        "bobsprite1":{"puuid":pat["puuid"], "summonerId":pat["summonerId"]
+                    }
+                }
+            }
+            )
 
-    count = 0
-    friend={}
-    for match in match_list:
-        matchid = match["matchid"]
-        oneMatch = get_db_match_detail().find_one({"matchid":matchid})
-        #logger.debug(f"oneMatch {oneMatch}")
-        for pat in oneMatch["info"]["participants"]:
-            if (pat["teamId"] == match["teamid"] and pat["puuid"] > puuid):
-                if (pat["puuid"] in friend):
-                    friend[pat["puuid"]] = friend[pat["puuid"]] + 1
-                else:
-                    friend[pat["puuid"]] = 1
-            
-            count += 1
-            if( count % 1000 == 0):
-                logger.debug(f'prroccess {puuid}  {count} teammates ')
+
     
-    for i, (k, v) in enumerate(friend.items()):
-        #if (v > 1):
-            get_db_pat_con_count().update_one({"puuid_sm":puuid, "puuid_bg": k }, {"$set": {"count": v}}, upsert = True )
-    
-    if(len(friend) > 0):
-        logger.debug(f"updating {puuid} is done, total teammates: {len(friend)}")
 
 def main(args) -> None:
     commondb.initdb(args)
-    # having summoner name is to make sure we have ALL the friend for this player
-    puuid_list = get_db_summoner().find({"name":{"$exists": True}}).sort("puuid",pymongo.ASCENDING)
-    pat_count = 0
-    for p in puuid_list:
-        process_one_pat(p["puuid"])
-        pat_count += 1
-        if (pat_count % 1000 == 0):
-            logger.debug(f"processing {pat_count} now. {p}")
+
+    match_detail_list = get_db_match_detail().find({}).sort("_id",pymongo.ASCENDING)
+    match_count = 0
+    for m in match_detail_list:
+        process_one_match(m)
+        match_count += 1
+        if (match_count % 1000 == 0):
+            logger.debug(f"processing {match_count} now. {m['matchid']}")
     
 
 

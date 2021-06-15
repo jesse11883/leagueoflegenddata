@@ -43,52 +43,41 @@ from config import DevelopmentConfig
 import x8common
 from commondb import *
 import commondb
-
+from commonapi import *
 
 def print_pretty(obj):
   logger.debug(json.dumps(obj, indent=2,ensure_ascii=False))
 
 
-def process_one_pat(puuid):
-    matching_rec = get_db_pat_match().count_documents({"puuid":puuid})
-    #logger.debug(f"{puuid} has {matching_rec} matches")
-    # We only process puuid that larger than me
-    match_list = get_db_pat_match().find({"puuid":puuid})
+#team can only be 0 or 1
+def process_one_sumoner(summ):
 
-    count = 0
-    friend={}
-    for match in match_list:
-        matchid = match["matchid"]
-        oneMatch = get_db_match_detail().find_one({"matchid":matchid})
-        #logger.debug(f"oneMatch {oneMatch}")
-        for pat in oneMatch["info"]["participants"]:
-            if (pat["teamId"] == match["teamid"] and pat["puuid"] > puuid):
-                if (pat["puuid"] in friend):
-                    friend[pat["puuid"]] = friend[pat["puuid"]] + 1
-                else:
-                    friend[pat["puuid"]] = 1
-            
-            count += 1
-            if( count % 1000 == 0):
-                logger.debug(f'prroccess {puuid}  {count} teammates ')
+    su_name = summ["name"]
+    sum_name_list = get_db_summoner().find({"name":su_name})
+    puuid_list = []
+    for sname in sum_name_list:
+        puuid_list.append(sname["bobsprite1"]["puuid"])
     
-    for i, (k, v) in enumerate(friend.items()):
-        #if (v > 1):
-            get_db_pat_con_count().update_one({"puuid_sm":puuid, "puuid_bg": k }, {"$set": {"count": v}}, upsert = True )
+    for puuid in puuid_list:
+        r = get_summoner_by_puuid(puuid)
+        get_db_summoner().update_one({"bobsprite1.puuid":puuid}, {"$set":r}, upsert=True)
     
-    if(len(friend) > 0):
-        logger.debug(f"updating {puuid} is done, total teammates: {len(friend)}")
 
 def main(args) -> None:
     commondb.initdb(args)
-    # having summoner name is to make sure we have ALL the friend for this player
-    puuid_list = get_db_summoner().find({"name":{"$exists": True}}).sort("puuid",pymongo.ASCENDING)
-    pat_count = 0
-    for p in puuid_list:
-        process_one_pat(p["puuid"])
-        pat_count += 1
-        if (pat_count % 1000 == 0):
-            logger.debug(f"processing {pat_count} now. {p}")
+    query_pipeline = [  
+                {"$group" : { "_id": "$name", "count": { "$sum": 1 } } },
+                {"$match": {"_id" :{ "$ne" : None } , "count" : {"$gt": 1} } }, 
+                {"$project": {"name" : "$_id", "_id" : 0, "count":"$count"} }
+    ]
+    print_pretty(query_pipeline)
+    summoner_list = get_db_summoner().aggregate(query_pipeline, allowDiskUse=True)
+    match_count = 0
+    for summ in summoner_list:
+        process_one_sumoner(summ)
+        match_count += 1
+        if (match_count % 1000 == 0):
+            logger.debug(f"processing {match_count} now. {summ['name']}")
     
 
 

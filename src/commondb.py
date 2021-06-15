@@ -70,9 +70,9 @@ def initdb(args):
     dbconn = DBConnection(args, cfg)
 
     db_summoner = dbconn.get_ds("MONGODB_DBNAME", "SUMMONER_COLLECTION")
-    db_summoner.create_index([("puuid", pymongo.ASCENDING)], name='idx_puuid', unique = True)
-    db_summoner.create_index([("name", pymongo.ASCENDING)], name='idx_name', unique = False)
-    db_summoner.create_index([("accountId", pymongo.ASCENDING)], name='idx_accountId', unique = False)
+    
+    db_summoner.create_index([("name", pymongo.ASCENDING)], name='idx_name', unique = True)
+    
     db_match_list = dbconn.get_ds("MONGODB_DBNAME", "MATCH_LIST_COLLECTION")
     db_match_list.create_index([("puuid", pymongo.ASCENDING),("matchid", pymongo.ASCENDING)], name='idx_puuid_matchid', unique = True)
     db_match_detail = dbconn.get_ds("MONGODB_DBNAME", "MATCH_DETAIL_COLLECTION")

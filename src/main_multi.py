@@ -20,13 +20,13 @@ from pathlib import Path
 import time
 timestring = time.strftime("_%Y_%m_%d_%H_%M_%S")
 logger = logging.getLogger("loldata")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 # create file handler which logs even debug messages
 fh = logging.FileHandler("./logs/loldata" + timestring +  '.log')
 fh.setLevel(logging.DEBUG)
 # create console handler with a higher log level
 ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
+ch.setLevel(logging.DEBUG)
 # create formatter and add it to the handlers
 formatter = logging.Formatter('%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 ch.setFormatter(formatter)
@@ -41,13 +41,38 @@ pp = PrettyPrinter(indent=4)
 from dbconn import DBConnection
 from config import DevelopmentConfig
 import x8common
-from commondb import *
-import commondb
 
 summonerName = "bobsprite1"
 URL_AM = "https://americas.api.riotgames.com"
 URL_NA = "https://na1.api.riotgames.com"
 TWO_MINUTES = 10
+
+dbconn = None 
+db_summoner = None
+db_match_list = None
+db_match_detail = None
+db_match_timeline = None 
+
+def get_dbconn():
+    global dbconn
+    return dbconn
+
+def get_db_summoner():
+    global db_summoner
+    return db_summoner
+
+def get_db_match_list():
+    global db_match_list
+    return db_match_list
+
+def get_db_match_detail():
+    global db_match_detail
+    return db_match_detail
+
+def get_db_match_timeline():
+    global db_match_timeline
+    return db_match_timeline
+
 
 
 def print_pretty(obj):
@@ -56,7 +81,7 @@ def print_pretty(obj):
 @sleep_and_retry
 @limits(calls=8, period=TWO_MINUTES)
 def retrieve(url, base_url = URL_NA):
-    headers ={ "X-Riot-Token":'RGAPI-8f1c62d2-b1e4-4c81-9e2e-cec8cf0c546f'}
+    headers ={ "X-Riot-Token":'RGAPI-2b492c13-410f-4f0e-8abb-f4bd1d92d32e'}
     request_url = urllib.parse.urljoin(base_url, url)
     r = requests.get(request_url,  headers=headers)
     return r.json()
@@ -166,28 +191,54 @@ def fetch_one_puuid(puuid):
 
 
 def main(args) -> None:
+    global dbconn
+    global db_summoner
+    global db_match_list
+    global db_match_detail
+    global db_match_timeline
+    cfg = DevelopmentConfig()
+    dbconn = DBConnection(args, cfg)
 
-    commondb.initdb(args)
+    db_summoner = dbconn.get_ds("MONGODB_DBNAME", "SUMMONER_COLLECTION")
+    db_summoner.create_index([("puuid", pymongo.ASCENDING)], name='idx_puuid', unique = True)
+    db_summoner.create_index([("name", pymongo.ASCENDING)], name='idx_name', unique = False)
+    db_summoner.create_index([("accountId", pymongo.ASCENDING)], name='idx_accountId', unique = False)
+    db_match_list = dbconn.get_ds("MONGODB_DBNAME", "MATCH_LIST_COLLECTION")
+    db_match_list.create_index([("puuid", pymongo.ASCENDING),("matchid", pymongo.ASCENDING)], name='idx_puuid_matchid', unique = True)
+    db_match_detail = dbconn.get_ds("MONGODB_DBNAME", "MATCH_DETAIL_COLLECTION")
+    db_match_detail.create_index([("matchid", pymongo.ASCENDING)], name='idx_matchid', unique = True)
+    db_match_timeline = dbconn.get_ds("MONGODB_DBNAME", "MATCH_TIMELINE_COLLECTION")
+    db_match_timeline.create_index([("matchid", pymongo.ASCENDING)], name='idx_matchid', unique = True)
 
-    # r = get_summoner_by_name('bobsprite1')
-    # print_pretty(r)
-    # db_summoner.update_one({"puuid":r["puuid"]}, {"$set":r}, upsert=True)
-    # puuid = r["puuid"]
-    # fetch_one_puuid(puuid)
-    count = 0
-    while True:
-        pid_list = list(get_db_summoner().find({"name": {"$exists": False}, "needUpdate":True}, {"puuid":1,"_id": False}).sort("_id",pymongo.ASCENDING).limit(100))
-        # pid_list = list(db_summoner.find({"name": {"$exists": False}}, {"puuid":1,"_id": False}).sort("_id",pymongo.ASCENDING).limit(100))
-        if len(pid_list) == 0:
-            logger.debug("We get all the puuid")
-            break
-        for puid in pid_list:
+
+    r = get_summoner_by_name('bobsprite1')
+    logger.debug(f"get_summoner_by_name {r}")
+    puuid = r["puuid"]
+    r = get_summoner_by_puuid(puuid)
+    logger.debug(f"get_summoner_by_puuid {r}")
+    m = get_match_list_puuid(r["puuid"])
+    mcount = 0
+    ## for matchid in m:
+        #logger.debug(f"query matchid {matchid}")
+        # matchobj = {"matchid":matchid}
+        # logger.debug(f"matchobj {matchobj}")
+    match = get_match_detail("NA1_3704345286")
+    logger.debug(f"match detail {pformat(match)}")
+
+    # count = 0
+    # while True:
+    #     pid_list = list(db_summoner.find({"name": {"$exists": False}, "needUpdate":True}, {"puuid":1,"_id": False}).sort("_id",pymongo.ASCENDING).limit(100))
+    #     # pid_list = list(db_summoner.find({"name": {"$exists": False}}, {"puuid":1,"_id": False}).sort("_id",pymongo.ASCENDING).limit(100))
+    #     if len(pid_list) == 0:
+    #         logger.debug("We get all the puuid")
+    #         break
+    #     for puid in pid_list:
             
-            fetch_one_puuid(puid["puuid"])
-            get_db_summoner().update_one({"puuid":puid["puuid"]}, {"$set": {"needUpdate":False}}, upsert=False)
-            count += 1
-            if(count % 100 == 0):
-                logger.info(f"processing {count} users")
+    #         fetch_one_puuid(puid["puuid"])
+    #         get_db_summoner().update_one({"puuid":puid["puuid"]}, {"$set": {"needUpdate":False}}, upsert=False)
+    #         count += 1
+    #         if(count % 100 == 0):
+    #             logger.info(f"processing {count} users")
 
 
 def add_extra_arg(parser):

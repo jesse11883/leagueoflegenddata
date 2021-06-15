@@ -58,7 +58,7 @@ def main(args) -> None:
         fieldnames = [ 'matchid', 'teamid',  
             '0_1', '0_2',  '0_3','0_4',  '1_2' ,'1_3', '1_4',  '2_3','2_4', '3_4',
             'cs_00','cs_01',  'cs_02','cs_03','cs_04', 'cs_05', 'cs_06', 'cs_07', 'cs_08', 'cs_09',  
-            'total_cs', 'gameDuration',  'win',  'total_death', 'total_kills',  'total_obj']
+            'total_cs', 'gameDuration',  'win',  'total_death', 'total_kills',  'total_obj', "delta_cs"]
           
          
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
