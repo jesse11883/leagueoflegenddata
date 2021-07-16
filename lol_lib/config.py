@@ -37,8 +37,12 @@ class Config(object):
     MATCH_DETAIL_COLLECTION="match_detail"
     TEAM_STATS_COLLECTION="team_stats"
     PAT_MATCH_COLLECTION="pat_match" 
+    PAT_MATCH_UNIFIED_COLLECTION="pat_match_unified"
     PAT_CONNECTION_COUNT_COLLECTION="pat_connection_count" 
-    GAME_CONNECTION_IMPACT_COLLECTION="game_connection_impact"    
+    PAT_CONNECTION_COUNT_UNIFIED_COLLECTION="pat_connection_count_unified" 
+    GAME_CONNECTION_IMPACT_COLLECTION="game_connection_impact"   
+    MATCH_TEAM_COLLECTION="match_team_unified" 
+    DEVELOPERS_COLLECTION="developers"     
     #SECRET_KEY = APP_SECRET_KEY
     #FLASK_APP = environ.get('FLASK_APP')
     #FLASK_ENV = environ.get('FLASK_ENV')

@@ -7,15 +7,15 @@ RUN mkdir -p /app/packages
 ADD requirements.txt /app/packages
 ENV TZ=America/Los_Angeles
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-# RUN apt-get update && apt-get install -y software-properties-common
-# RUN apt-get update && apt-get install -y \
-#     curl \
-#     git \
-#     cron \
-#     vim \
-#     unzip \
-#     awscli \
-#     vim
+RUN apt-get update && apt-get install -y software-properties-common
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    cron \
+    vim \
+    unzip \
+    awscli \
+    vim
 
 
 RUN pip install -r /app/packages/requirements.txt
@@ -43,8 +43,14 @@ RUN chown --changes --silent --no-dereference --recursive \
         ${PUID}:${PUID} \
         /.local/lib
 
+RUN mkdir -p /.local/lib/python3.9
+RUN chown --changes --silent --no-dereference --recursive \
+        ${PUID}:${PUID} \
+        /.local/lib/python3.9
 
-
-
+RUN mkdir -p /.cache/pip
+RUN chown --changes --silent --no-dereference --recursive \
+        ${PUID}:${PUID} \
+        /.cache/pip
 
 USER ${USER}

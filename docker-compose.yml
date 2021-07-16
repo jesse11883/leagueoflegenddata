@@ -4,6 +4,7 @@ services:
     game_python3:
         build: 
             context: .
+            dockerfile: ./Dockerfile
         image: lol_python3:v1.0
         user: ${CURRENT_UID}
         volumes:

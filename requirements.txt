@@ -50,3 +50,5 @@ emoji
 #fairseq
 #fastBPE
 ratelimit
+shortuuid
+motor
